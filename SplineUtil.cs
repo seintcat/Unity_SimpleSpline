@@ -8,7 +8,7 @@ using UnityEditor;
 public static class SplineUtil
 {
 #if UNITY_EDITOR
-    public static void DrawBezier(int startIndex, int endIndex, List<SplineVertex> vertexes, Vector3 targetPos, ISplineObject handleObj)
+    public static void DrawBezier(int startIndex, int endIndex, List<SplineVertex> vertexes, Vector3 targetPos, SplineManager handleObj)
     {
         Handles.DrawBezier(
             vertexes[startIndex].position + targetPos,
@@ -20,7 +20,7 @@ public static class SplineUtil
             10f);
     }
 
-    public static void DrawHandles(int index, List<SplineVertex> vertexes, Vector3 targetPos, GUIStyle textStyle, ISplineObject handleObj)
+    public static void DrawHandles(int index, List<SplineVertex> vertexes, Vector3 targetPos, GUIStyle textStyle, SplineManager handleObj)
     {
         if (index > -1 && index < vertexes.Count)
         {
@@ -28,34 +28,51 @@ public static class SplineUtil
             SplineVertex vertex = vertexes[index];
             Vector3 localVertexPos = vertexes[index].position + targetPos;
 
-            if (handleObj.handleMode == SplineVertexHandleMode.Move)
+            if (handleObj.handleMode == SplineVertexHandleMode.MoveVertex)
             {
-                if (handleObj.splineMode == SplineMode.Bezier)
-                {
-                    Handles.Label(vertexes[index].startTangent + localVertexPos, index.ToString() + " Start", textStyle);
-                    Handles.DrawPolyLine(localVertexPos, vertexes[index].startTangent + localVertexPos);
-                    Vector3 newTargetStartTangent = Handles.PositionHandle(vertexes[index].startTangent + localVertexPos, Quaternion.identity);
-                    if (EditorGUI.EndChangeCheck())
-                    {
-                        vertex.startTangent = newTargetStartTangent - localVertexPos;
-                        handleObj.SetVertex(index, vertex);
-                    }
-
-                    Handles.Label(vertexes[index].endTangent + localVertexPos, index.ToString() + " End", textStyle);
-                    Handles.DrawPolyLine(localVertexPos, vertexes[index].endTangent + localVertexPos);
-                    Vector3 newTargetEndTangent = Handles.PositionHandle(vertexes[index].endTangent + localVertexPos, Quaternion.identity);
-                    if (EditorGUI.EndChangeCheck())
-                    {
-                        vertex.endTangent = newTargetEndTangent - localVertexPos;
-                        handleObj.SetVertex(index, vertex);
-                    }
-                }
-
                 Vector3 newPos = Handles.PositionHandle(localVertexPos, Quaternion.identity);
                 if (EditorGUI.EndChangeCheck())
                 {
                     vertex.position = newPos - targetPos;
                     handleObj.SetVertex(index, vertex);
+                }
+            }
+            else if (handleObj.handleMode == SplineVertexHandleMode.MoveTangent)
+            {
+                if(handleObj.splineMode != SplineMode.Straight)
+                {
+                    if (handleObj.splineMode == SplineMode.Bezier)
+                    {
+                        Handles.Label(vertexes[index].startTangent + localVertexPos, index.ToString() + " Start", textStyle);
+                        Handles.DrawPolyLine(localVertexPos, vertexes[index].startTangent + localVertexPos);
+                        Vector3 newTargetStartTangent = Handles.PositionHandle(vertexes[index].startTangent + localVertexPos, Quaternion.identity);
+                        if (EditorGUI.EndChangeCheck())
+                        {
+                            vertex.startTangent = newTargetStartTangent - localVertexPos;
+                            handleObj.SetVertex(index, vertex);
+                        }
+
+                        Handles.Label(vertexes[index].endTangent + localVertexPos, index.ToString() + " End", textStyle);
+                        Handles.DrawPolyLine(localVertexPos, vertexes[index].endTangent + localVertexPos);
+                        Vector3 newTargetEndTangent = Handles.PositionHandle(vertexes[index].endTangent + localVertexPos, Quaternion.identity);
+                        if (EditorGUI.EndChangeCheck())
+                        {
+                            vertex.endTangent = newTargetEndTangent - localVertexPos;
+                            handleObj.SetVertex(index, vertex);
+                        }
+                    }
+                    else if (handleObj.splineMode == SplineMode.OneTangent)
+                    {
+                        Handles.Label(vertexes[index].startTangent + localVertexPos, index.ToString() + " Start", textStyle);
+                        Handles.DrawPolyLine(localVertexPos, vertexes[index].startTangent + localVertexPos);
+                        Vector3 newTargetStartTangent = Handles.PositionHandle(vertexes[index].startTangent + localVertexPos, Quaternion.identity);
+                        if (EditorGUI.EndChangeCheck())
+                        {
+                            vertex.startTangent = newTargetStartTangent - localVertexPos;
+                            vertex.endTangent = -vertex.startTangent;
+                            handleObj.SetVertex(index, vertex);
+                        }
+                    }
                 }
             }
             else if (handleObj.handleMode == SplineVertexHandleMode.Rotate)
@@ -66,18 +83,8 @@ public static class SplineUtil
                     vertex.rotation = newRot;
                     handleObj.SetVertex(index, vertex);
                 }
-                Handles.PositionHandle(localVertexPos, Quaternion.Euler(vertexes[index].rotation.eulerAngles));
             }
         }
     }
 #endif
-}
-
-public interface ISplineObject
-{
-    public Color lineColor { get; }
-    public SplineVertexHandleMode handleMode { get; }
-    public SplineMode splineMode { get; }
-
-    public void SetVertex(int index, SplineVertex vertex);
 }

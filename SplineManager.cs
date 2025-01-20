@@ -2,8 +2,11 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
-public class SplineManager : MonoBehaviour, ISplineObject
+public class SplineManager : MonoBehaviour
 {
 #if UNITY_EDITOR
     [Header("Editor")]
@@ -12,9 +15,7 @@ public class SplineManager : MonoBehaviour, ISplineObject
     public Color lineColor = Color.black;
     public Color textColor = Color.black;
     public SplineVertexHandleMode handleMode;
-
-    Color ISplineObject.lineColor => lineColor;
-    SplineVertexHandleMode ISplineObject.handleMode => handleMode;
+    public List<Transform> vertexAdding;
 #endif
 
     [Header("Core")]
@@ -23,8 +24,6 @@ public class SplineManager : MonoBehaviour, ISplineObject
     public bool followerClamping;
     public SplineMode splineMode;
     public List<SplineVertex> vertexes;
-
-    SplineMode ISplineObject.splineMode => splineMode;
 
     private List<float> splineDistances;
 
@@ -58,9 +57,8 @@ public class SplineManager : MonoBehaviour, ISplineObject
         {
             _transform.position += Vector3.Lerp(vertexes[start].position, vertexes[end].position, ratio);
         }
-        else if(splineMode == SplineMode.Bezier)
+        else if(splineMode == SplineMode.Bezier || splineMode == SplineMode.OneTangent)
         {
-            Vector3 forward = new Vector3();
             List<Vector3> CasteljauList = new List<Vector3>() { 
                 vertexes[start].position, 
                 vertexes[start].startTangent + vertexes[start].position, 
@@ -73,12 +71,6 @@ public class SplineManager : MonoBehaviour, ISplineObject
                     CasteljauList[i] = Vector3.Lerp(CasteljauList[i], CasteljauList[i + 1], ratio);
                 }
                 CasteljauList.RemoveAt(CasteljauList.Count - 1);
-
-                if(CasteljauList.Count == 2)
-                {
-                    forward = CasteljauList[1] - CasteljauList[0];
-                    forward.Normalize();
-                }
             }
             _transform.position += CasteljauList[0];
         }
@@ -214,7 +206,7 @@ public class SplineManager : MonoBehaviour, ISplineObject
         {
             return (vertexes[start].position - vertexes[end].position).magnitude;
         }
-        else if(splineMode == SplineMode.Bezier)
+        else if(splineMode == SplineMode.Bezier || splineMode == SplineMode.OneTangent)
         {
             if (accurateDistance)
             {
@@ -308,17 +300,39 @@ public class SplineManager : MonoBehaviour, ISplineObject
     private void SetDistance()
     {
         splineDistances = new List<float>();
-
-
     }
+
+    private void OnValidate()
+    {
+#if UNITY_EDITOR
+        if(handleMode != SplineVertexHandleMode.None && Tools.current != Tool.None)
+        {
+            Tools.current = Tool.None;
+        }
+#endif
+    }
+
+#if UNITY_EDITOR
+    private void OnDrawGizmosSelected()
+    {
+        foreach(SplineVertex vertex in vertexes)
+        {
+            Gizmos.color = lineColor;
+            Gizmos.DrawRay(transform.position + vertex.position, vertex.rotation * Vector3.forward);
+            Gizmos.color = Color.white;
+            Gizmos.DrawRay(transform.position + vertex.position, vertex.rotation * Vector3.up);
+        }
+    }
+#endif
 }
 
 #if UNITY_EDITOR
 public enum SplineVertexHandleMode
 {
     None = 0,
-    Move = 1,
-    Rotate = 2
+    MoveVertex = 1,
+    MoveTangent = 2,
+    Rotate = 3
 }
 #endif
 
@@ -335,5 +349,6 @@ public enum SplineMode
 {
     Straight = 0,
     Bezier = 1,
+    OneTangent = 2,
 }
 
